@@ -215,12 +215,47 @@ void MP1Node::checkMessages() {
  * DESCRIPTION: Message handler for different message types
  */
 bool MP1Node::recvCallBack(void *env, char *data, int size ) {
-    // expected size of join message
-    size_t joinmsgsize = sizeof(MessageHdr) + sizeof(char[6]) + sizeof(long) + 1;
-    if (size >=0 && (size_t)size == joinmsgsize) {
-        cout<<"JOIN MESSAGE"<<endl;
-        // log->LOG(&memberNode->addr, "JOIN MESSAGE");
+    long heartbeat;
+    Address addr;
+    MessageHdr *msg = (MessageHdr *) data;
+
+    switch (msg->msgType)
+    {
+    case JOINREQ:
+        cout<<"JOINREQ"<<endl;
+        memcpy(&(addr.addr), (char *)(msg+1), sizeof(char[6]));
+        memcpy(&heartbeat, (char *)(msg+1) + 1 + sizeof(memberNode->addr.addr), sizeof(heartbeat));
+        addMember(addr, heartbeat);
+        gossipMembership(msg->msgType, addr);
+        break;
+    case JOINREP:
+        cout<<"JOINREP"<<endl;
+        break;
+    case MEMSHPLIST:
+        cout<<"MEMSHPLIST"<<endl;
+        break;
+    default:
+        break;
     }
+}
+
+void MP1Node::gossipMembership(MsgTypes msgType, Address addr) {
+    
+}
+
+void MP1Node::addMember(Address addr, long heartbeat) {
+    int id = *(int*)(&addr.addr[0]);
+	short port = *(short*)(&addr.addr[4]);
+
+    memberNode->nnb += 1;
+    MemberListEntry newMember = MemberListEntry(
+        id,
+        port,
+        heartbeat,
+        par->getcurrtime()
+    );
+    memberNode->memberList.push_back(newMember);
+    log->logNodeAdd(&memberNode->addr, &addr);
 }
 
 /**

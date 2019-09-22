@@ -31,8 +31,7 @@
 enum MsgTypes{
     JOINREQ,
     JOINREP,
-    MEMSHPLIST,
-		LEAVEREQ
+    MEMSHPLIST
 };
 
 /**
@@ -71,6 +70,8 @@ public:
 	void nodeLoop();
 	void checkMessages();
 	bool recvCallBack(void *env, char *data, int size);
+	void gossipMembership(MsgTypes msgType, Address addr);
+	void addMember(Address addr, long heartbeat);
 	void nodeLoopOps();
 	int isNullAddress(Address *addr);
 	Address getJoinAddress();
