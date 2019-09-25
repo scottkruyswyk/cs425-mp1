@@ -218,24 +218,67 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
     long heartbeat;
     Address addr;
     MessageHdr *msg = (MessageHdr *) data;
+    char * restOfMessage = (char *)(msg + 1);
 
     switch (msg->msgType)
     {
     case JOINREQ:
-        cout<<"JOINREQ"<<endl;
-        memcpy(&(addr.addr), (char *)(msg+1), sizeof(char[6]));
-        memcpy(&heartbeat, (char *)(msg+1) + 1 + sizeof(memberNode->addr.addr), sizeof(heartbeat));
+        memcpy(&(addr.addr), restOfMessage, sizeof(memberNode->addr.addr));
+        
+        // cout<<"Received join req at node: ";
+        // printAddress(&memberNode->addr);
+        // cout<< " from node: ";
+        // printAddress(&addr);
+        // cout << endl;
+
+        memcpy(&heartbeat, restOfMessage + sizeof(memberNode->addr.addr), sizeof(heartbeat));
         addMember(addr, heartbeat);
-        gossipMembershipToNode(msg->msgType, &addr);
+        gossipMembershipToNode(JOINREP, &addr);
         break;
     case JOINREP:
-        cout<<"JOINREP"<<endl;
+        // cout<<"Received join reply at node: ";
+        // printAddress(&memberNode->addr);
+        // cout<< endl;
+
+
+        processJoinReply(restOfMessage, size - sizeof(MessageHdr));
         break;
     case MEMSHPLIST:
         cout<<"MEMSHPLIST"<<endl;
+        updateMemberList(restOfMessage, size - sizeof(MessageHdr));
         break;
     default:
         break;
+    }
+}
+
+void MP1Node::updateMemberList(char * message, int size) {
+    size_t memberListLength;
+    // Read size of member list, move message pointer
+    memcpy(&memberListLength, message, sizeof(size_t));
+    message+= sizeof(size_t);
+
+    MemberListEntry nextEntry;
+    for (int i = 0; i < memberListLength; i++) {
+        memcpy(&nextEntry, message, sizeof(MemberListEntry));
+        message += sizeof(MemberListEntry);
+    }
+}
+
+void MP1Node::processJoinReply(char * message, int size) {
+    size_t memberListLength;
+    // Confirm we are now in the group
+    memberNode->inGroup = true;
+
+    // Read size of member list, move message pointer
+    memcpy(&memberListLength, message, sizeof(size_t));
+    message+= sizeof(size_t);
+
+    MemberListEntry newEntry;
+    for (int i = 0; i < memberListLength; i++) {
+        memcpy(&newEntry, message, sizeof(MemberListEntry));
+        message += sizeof(MemberListEntry);
+        addMember(newEntry.getid(), newEntry.getport(), newEntry.getheartbeat());
     }
 }
 
@@ -265,10 +308,7 @@ void MP1Node::gossipMembershipToNode(MsgTypes msgType, Address *addr) {
     free(msg);
 }
 
-void MP1Node::addMember(Address addr, long heartbeat) {
-    int id = *(int*)(&addr.addr[0]);
-	short port = *(short*)(&addr.addr[4]);
-
+void MP1Node::addMember(int id, int port, long heartbeat) {
     memberNode->nnb += 1;
     MemberListEntry newMember = MemberListEntry(
         id,
@@ -277,7 +317,14 @@ void MP1Node::addMember(Address addr, long heartbeat) {
         par->getcurrtime()
     );
     memberNode->memberList.push_back(newMember);
+    Address addr = Address(to_string(id) + ":" + to_string(port));
     log->logNodeAdd(&memberNode->addr, &addr);
+}
+
+void MP1Node::addMember(Address addr, long heartbeat) {
+    int id = *(int*)(&addr.addr[0]);
+	short port = *(short*)(&addr.addr[4]);
+    addMember(id, port, heartbeat);
 }
 
 /**

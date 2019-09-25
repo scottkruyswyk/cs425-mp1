@@ -70,8 +70,11 @@ public:
 	void nodeLoop();
 	void checkMessages();
 	bool recvCallBack(void *env, char *data, int size);
+	void processJoinReply(char * message, int size);
+	void updateMemberList(char * message, int size);
 	void gossipMembershipToNode(MsgTypes msgType, Address *addr);
 	void addMember(Address addr, long heartbeat);
+	void addMember(int id, int port, long heartbeat);
 	void nodeLoopOps();
 	int isNullAddress(Address *addr);
 	Address getJoinAddress();
