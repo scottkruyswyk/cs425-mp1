@@ -226,7 +226,7 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
         memcpy(&(addr.addr), (char *)(msg+1), sizeof(char[6]));
         memcpy(&heartbeat, (char *)(msg+1) + 1 + sizeof(memberNode->addr.addr), sizeof(heartbeat));
         addMember(addr, heartbeat);
-        gossipMembership(msg->msgType, addr);
+        gossipMembershipToNode(msg->msgType, &addr);
         break;
     case JOINREP:
         cout<<"JOINREP"<<endl;
@@ -239,8 +239,30 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
     }
 }
 
-void MP1Node::gossipMembership(MsgTypes msgType, Address addr) {
+void MP1Node::gossipMembershipToNode(MsgTypes msgType, Address *addr) {
+    MessageHdr *msg;
+    size_t memberListEntrySize = sizeof(MemberListEntry);
+    size_t memberListLength = memberNode->memberList.size();
     
+    // header + member list length + membership list
+    size_t msgsize = sizeof(MessageHdr) + sizeof(long) + (memberListLength * memberListEntrySize);
+    msg = (MessageHdr *) malloc(msgsize * sizeof(char));
+    msg->msgType = msgType;
+    memcpy((char *)(msg+1) , &memberListLength, sizeof(size_t));
+
+    // iterate through memberlist 
+    // append entry info to list
+    int counter = 0;
+    for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
+        // Already offset by MessageHdr + memberListLength
+        // increment offset by MemberListEntry size for each entry
+        memcpy((char *)(msg+1) + 1 + sizeof(size_t) + sizeof(MemberListEntry) * counter, &(*it), sizeof(MemberListEntry));
+        counter++;
+    }
+
+    emulNet->ENsend(&memberNode->addr, addr, (char *) msg, msgsize);
+
+    free(msg);
 }
 
 void MP1Node::addMember(Address addr, long heartbeat) {
