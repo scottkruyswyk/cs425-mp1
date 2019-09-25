@@ -76,6 +76,7 @@ public:
 	void addOrUpdateMember(MemberListEntry entry);
 	void addMember(Address addr, long heartbeat);
 	void addMember(int id, int port, long heartbeat);
+	void addressFromIdAndPort(Address *addr, int id, short port);
 	void nodeLoopOps();
 	int isNullAddress(Address *addr);
 	Address getJoinAddress();

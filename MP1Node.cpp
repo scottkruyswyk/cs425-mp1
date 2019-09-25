@@ -244,7 +244,6 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
         processJoinReply(restOfMessage, size - sizeof(MessageHdr));
         break;
     case MEMSHPLIST:
-        cout<<"MEMSHPLIST"<<endl;
         updateMemberList(restOfMessage, size - sizeof(MessageHdr));
         break;
     default:
@@ -261,6 +260,7 @@ void MP1Node::updateMemberList(char * message, int size) {
     MemberListEntry nextEntry;
     for (int i = 0; i < memberListLength; i++) {
         memcpy(&nextEntry, message, sizeof(MemberListEntry));
+        addOrUpdateMember(nextEntry);
         message += sizeof(MemberListEntry);
     }
 }
@@ -331,7 +331,8 @@ void MP1Node::addMember(int id, int port, long heartbeat) {
         par->getcurrtime()
     );
     memberNode->memberList.push_back(newMember);
-    Address addr = Address(to_string(id) + ":" + to_string(port));
+    Address addr;
+    addressFromIdAndPort(&addr, id, port);
     log->logNodeAdd(&memberNode->addr, &addr);
 }
 
@@ -349,12 +350,35 @@ void MP1Node::addMember(Address addr, long heartbeat) {
  * 				Propagate your membership list
  */
 void MP1Node::nodeLoopOps() {
+    Address addr;
+    
+    // Remove nodes that have timed out past TREMOVE
+    for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
+        addressFromIdAndPort(&addr, it->getid(), it->getport());
+        // Store ref to self for use later
+        if (addr == memberNode->addr) {
+            // Update own hearbeat
+            it->setheartbeat(it->getheartbeat() + 1);
+        }
+        
+        // check timestamp of last membership update
 
-	/*
-	 * Your code goes here
-	 */
+    }
 
-    return;
+    memberNode->pingCounter--;
+
+    if (memberNode->pingCounter == 0) {
+        memberNode->pingCounter = TFAIL;
+        for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
+            addressFromIdAndPort(&addr, it->getid(), it->getport());
+            gossipMembershipToNode(MEMSHPLIST, &addr);
+        }
+    }
+}
+
+void MP1Node::addressFromIdAndPort(Address *addr, int id, short port) {
+    memcpy(&addr->addr[0], &id,  sizeof(int));
+    memcpy(&addr->addr[4], &port, sizeof(short));
 }
 
 /**
