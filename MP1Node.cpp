@@ -265,6 +265,20 @@ void MP1Node::updateMemberList(char * message, int size) {
     }
 }
 
+void MP1Node::addOrUpdateMember(MemberListEntry entry) {
+    for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
+        if (it->getid() == entry.getid() && it->getport() == entry.getport()) {
+            if (it->getheartbeat() > entry.getheartbeat()) {
+                it->setheartbeat(entry.getheartbeat());
+                it->settimestamp(par->getcurrtime());
+            }
+            return;
+        }
+    }
+
+    addMember(entry.getid(), entry.getport(), entry.getheartbeat());
+}
+
 void MP1Node::processJoinReply(char * message, int size) {
     size_t memberListLength;
     // Confirm we are now in the group
