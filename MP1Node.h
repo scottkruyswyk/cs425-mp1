@@ -71,6 +71,7 @@ public:
 	void checkMessages();
 	bool recvCallBack(void *env, char *data, int size);
 	void processJoinReply(char * message, int size);
+	void gossipToAllNodes();
 	void gossipMembershipToNode(MsgTypes msgType, Address *addr);
 	void updateMemberList(char * message, int size);
 	void addOrUpdateMember(MemberListEntry entry);

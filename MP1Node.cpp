@@ -231,9 +231,10 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
         // printAddress(&addr);
         // cout << endl;
 
-        memcpy(&heartbeat, restOfMessage + sizeof(memberNode->addr.addr), sizeof(heartbeat));
+        memcpy(&heartbeat, restOfMessage + 1 + sizeof(memberNode->addr.addr), sizeof(heartbeat));
         addMember(addr, heartbeat);
         gossipMembershipToNode(JOINREP, &addr);
+        gossipToAllNodes();
         break;
     case JOINREP:
         // cout<<"Received join reply at node: ";
@@ -268,7 +269,7 @@ void MP1Node::updateMemberList(char * message, int size) {
 void MP1Node::addOrUpdateMember(MemberListEntry entry) {
     for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
         if (it->getid() == entry.getid() && it->getport() == entry.getport()) {
-            if (it->getheartbeat() > entry.getheartbeat()) {
+            if (it->getheartbeat() < entry.getheartbeat()) {
                 it->setheartbeat(entry.getheartbeat());
                 it->settimestamp(par->getcurrtime());
             }
@@ -276,6 +277,10 @@ void MP1Node::addOrUpdateMember(MemberListEntry entry) {
         }
     }
 
+    // Address a;
+    // addressFromIdAndPort(&a, entry.getid(), entry.getport());
+    // cout<<"Adding member: ";
+    // printAddress(&a);
     addMember(entry.getid(), entry.getport(), entry.getheartbeat());
 }
 
@@ -313,7 +318,7 @@ void MP1Node::gossipMembershipToNode(MsgTypes msgType, Address *addr) {
     for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
         // Already offset by MessageHdr + memberListLength
         // increment offset by MemberListEntry size for each entry
-        memcpy((char *)(msg+1) + 1 + sizeof(size_t) + sizeof(MemberListEntry) * counter, &(*it), sizeof(MemberListEntry));
+        memcpy((char *)(msg+1) + sizeof(size_t) + sizeof(MemberListEntry) * counter, &(*it), sizeof(MemberListEntry));
         counter++;
     }
 
@@ -351,17 +356,29 @@ void MP1Node::addMember(Address addr, long heartbeat) {
  */
 void MP1Node::nodeLoopOps() {
     Address addr;
-    
+    memberNode->heartbeat++;
     // Remove nodes that have timed out past TREMOVE
-    for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
+    for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end();) {
         addressFromIdAndPort(&addr, it->getid(), it->getport());
-        // Store ref to self for use later
+        // Update own hearbeat
         if (addr == memberNode->addr) {
-            // Update own hearbeat
-            it->setheartbeat(it->getheartbeat() + 1);
+            it->setheartbeat(memberNode->heartbeat);
+            it->settimestamp(par->getcurrtime());
         }
         
         // check timestamp of last membership update
+        // If past the timeout period then we remove
+        if (par->getcurrtime() - it->gettimestamp() > TREMOVE) {
+            // cout<<"last timestamp: " << it->gettimestamp() << " - Current: "<< par->getcurrtime() << " removing node: ";
+            // printAddress(&addr);
+            // cout<<"From list of node: ";
+            // printAddress(&memberNode->addr);
+            memberNode->nnb--;
+            log->logNodeRemove(&memberNode->addr, &addr);
+            memberNode->memberList.erase(it);
+        } else {
+            ++it;
+        }
 
     }
 
@@ -369,10 +386,15 @@ void MP1Node::nodeLoopOps() {
 
     if (memberNode->pingCounter == 0) {
         memberNode->pingCounter = TFAIL;
-        for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
-            addressFromIdAndPort(&addr, it->getid(), it->getport());
-            gossipMembershipToNode(MEMSHPLIST, &addr);
-        }
+        gossipToAllNodes();
+    }
+}
+
+void MP1Node::gossipToAllNodes() {
+    Address addr;
+    for (std::vector<MemberListEntry>::iterator it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
+        addressFromIdAndPort(&addr, it->getid(), it->getport());
+        gossipMembershipToNode(MEMSHPLIST, &addr);
     }
 }
 
