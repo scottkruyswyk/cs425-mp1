@@ -296,13 +296,7 @@ void MP1Node::processJoinReply(char * message, int size) {
     // Read size of member list, move message pointer
     memcpy(&memberListLength, message, sizeof(size_t));
     message+= sizeof(size_t);
-
-    MemberListEntry newEntry;
-    for (int i = 0; i < memberListLength; i++) {
-        memcpy(&newEntry, message, sizeof(MemberListEntry));
-        message += sizeof(MemberListEntry);
-        addMember(newEntry.getid(), newEntry.getport(), newEntry.getheartbeat());
-    }
+    updateMemberList((message + sizeof(size_t)), memberListLength);
 }
 
 void MP1Node::gossipMembershipToNode(MsgTypes msgType, Address *addr) {
