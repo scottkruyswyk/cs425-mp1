@@ -109,6 +109,11 @@ int MP1Node::initThisNode(Address *joinaddr) {
 	memberNode->timeOutCounter = -1;
     initMemberListTable(memberNode);
 
+    // Add reference to memberNode's self to membership list
+    MemberListEntry myEntry = MemberListEntry(id, port, memberNode->heartbeat, par->getcurrtime());
+    memberNode->memberList.push_back(myEntry);
+    memberNode->myPos = memberNode->memberList.begin();
+
     return 0;
 }
 
@@ -160,9 +165,8 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
  * DESCRIPTION: Wind up this node and clean up state
  */
 int MP1Node::finishUpThisNode(){
-   /*
-    * Your code goes here
-    */
+   memberNode->inGroup = false;
+   initMemberListTable(memberNode);
 }
 
 /**
